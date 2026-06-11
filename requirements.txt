@@ -1,5 +1,0 @@
-requests
-beautifulsoup4
-curl_cffi
-cloudscraper
-psycopg2-binary
