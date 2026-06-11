@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harga Emas ANTAM — Tracker Harian</title>
+<meta name="description" content="Harga emas batangan ANTAM & buyback hari ini, dengan arsip harga per tanggal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,640&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#121008; --surface:#1c1810; --surface2:#221d12; --line:#2e2716;
+    --text:#f0e9d8; --muted:#9a8f73; --gold:#d9a441; --gold-hi:#f2c14e;
+    --naik:#7fbf7a; --turun:#e07856;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{color-scheme:dark}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;
+    line-height:1.55; min-height:100vh;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 64px}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    gap:16px; flex-wrap:wrap; padding:34px 0 22px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand h1{
+    font-family:"Fraunces",serif; font-weight:640; font-size:clamp(26px,4vw,36px);
+    letter-spacing:.01em;
+  }
+  .brand p{color:var(--muted); font-size:13.5px; margin-top:2px}
+  .picker{display:flex; align-items:center; gap:10px}
+  .picker label{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  select{
+    background:var(--surface); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:9px 12px; font:500 14px "IBM Plex Mono",monospace;
+    cursor:pointer;
+  }
+  select:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:grid; grid-template-columns:1.4fr 1fr; gap:18px; margin-top:26px;
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:24px;
+  }
+  .stamp{ /* signature: cap halus seperti cetakan pada batangan */
+    display:inline-block; border:1px solid var(--gold); color:var(--gold);
+    font:500 10.5px "IBM Plex Mono",monospace; letter-spacing:.32em;
+    padding:4px 10px 4px 12px; border-radius:3px; text-transform:uppercase;
+  }
+  .hero .label{color:var(--muted); font-size:13px; margin-top:16px}
+  .price-xl{
+    font:600 clamp(38px,6vw,56px)/1.1 "IBM Plex Mono",monospace;
+    color:var(--gold-hi); letter-spacing:-.01em; margin-top:4px;
+    text-shadow:0 1px 0 rgba(0,0,0,.5);
+  }
+  .price-xl small{font-size:.45em; color:var(--muted); font-weight:400}
+  .sub{color:var(--muted); font-size:13.5px; margin-top:8px}
+  .sub b{color:var(--text); font-family:"IBM Plex Mono",monospace; font-weight:500}
+
+  .bb-row{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px}
+  .price-lg{font:600 30px "IBM Plex Mono",monospace}
+  .delta{font:500 13px "IBM Plex Mono",monospace; padding:3px 8px; border-radius:6px}
+  .delta.naik{color:var(--naik); background:rgba(127,191,122,.12)}
+  .delta.turun{color:var(--turun); background:rgba(224,120,86,.12)}
+  .delta.netral{color:var(--muted); background:rgba(154,143,115,.12)}
+  .divider{border:0; border-top:1px solid var(--line); margin:16px 0}
+
+  /* ---------- tabel ---------- */
+  section{margin-top:34px}
+  h2{
+    font-family:"Fraunces",serif; font-weight:640; font-size:21px; margin-bottom:4px;
+  }
+  .note{color:var(--muted); font-size:13px; margin-bottom:14px}
+  table{width:100%; border-collapse:collapse; font-size:14.5px}
+  th{
+    text-align:right; color:var(--muted); font-weight:500; font-size:12px;
+    letter-spacing:.1em; text-transform:uppercase; padding:10px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  th:first-child, td:first-child{text-align:left}
+  td{
+    padding:11px 14px; border-bottom:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace; text-align:right;
+  }
+  td:first-child{font-family:"Plus Jakarta Sans",sans-serif; font-weight:500}
+  tbody tr:hover{background:var(--surface2)}
+  details{margin-top:14px; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  summary{
+    cursor:pointer; padding:13px 18px; background:var(--surface);
+    font-weight:600; font-size:14.5px; list-style:none;
+  }
+  summary::before{content:"+ "; color:var(--gold)}
+  details[open] summary::before{content:"− "}
+  summary:focus-visible{outline:2px solid var(--gold); outline-offset:-2px}
+  details .inner{padding:0 6px 6px}
+
+  /* ---------- grafik & status ---------- */
+  .chart-card{padding:20px 18px 12px}
+  #chart-wrap{position:relative; height:320px}
+  .status{
+    margin-top:26px; padding:28px; text-align:center; color:var(--muted);
+    border:1px dashed var(--line); border-radius:14px; font-size:14.5px;
+  }
+  footer{
+    margin-top:44px; padding-top:18px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:12.5px; display:flex; gap:8px;
+    justify-content:space-between; flex-wrap:wrap;
+  }
+  footer a{color:var(--gold); text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  @media (max-width:720px){
+    .hero{grid-template-columns:1fr}
+    th,td{padding:9px 8px; font-size:13px}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .reveal{animation:up .45s ease both}
+    @keyframes up{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>Harga Emas ANTAM</h1>
+      <p>Emas batangan &amp; buyback · diperbarui otomatis setiap pagi 09.05 WIB</p>
+    </div>
+    <div class="picker">
+      <label for="tanggal">Tanggal</label>
+      <select id="tanggal" aria-label="Pilih tanggal data"></select>
+    </div>
+  </header>
+
+  <div id="app"></div>
+
+  <footer>
+    <span>Sumber data: <a href="https://www.logammulia.com/id/harga-emas-hari-ini" rel="noopener">logammulia.com</a> (PT ANTAM Tbk)</span>
+    <span id="meta"></span>
+  </footer>
+</div>
+
+<script>
+const fmt = new Intl.NumberFormat('id-ID');
+const fmtTgl = t => new Date(t + 'T00:00:00').toLocaleDateString('id-ID',
+  { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+const app = document.getElementById('app');
+const selTanggal = document.getElementById('tanggal');
+let INDEX = null, HISTORY = [], chart = null;
+
+async function getJSON(path){
+  const r = await fetch(path + '?t=' + Date.now());
+  if(!r.ok) throw new Error(path + ' → ' + r.status);
+  return r.json();
+}
+
+function deltaBadge(val, satuan){
+  if(val === null || val === undefined)
+    return '';
+  const cls = val > 0 ? 'naik' : (val < 0 ? 'turun' : 'netral');
+  const tanda = val > 0 ? '▲ +' : (val < 0 ? '▼ −' : '· ');
+  return `<span class="delta ${cls}">${tanda}Rp ${fmt.format(Math.abs(val))}${satuan||''}</span>`;
+}
+
+function tabel(rows){
+  const tr = rows.map(r => `
+    <tr>
+      <td>${fmt.format(r.berat_gr)} gram</td>
+      <td>Rp ${fmt.format(r.harga_dasar)}</td>
+      <td>Rp ${fmt.format(r.harga_pajak)}</td>
+    </tr>`).join('');
+  return `<table>
+    <thead><tr><th>Berat</th><th>Harga Dasar</th><th>+ PPh 0,25%</th></tr></thead>
+    <tbody>${tr}</tbody></table>`;
+}
+
+function render(tanggal, snap){
+  const kategori = snap.harga?.kategori || {};
+  const batangan = kategori['Emas Batangan'] || [];
+  const satu = batangan.find(x => x.berat_gr === 1);
+  const bb = snap.buyback || {};
+
+  // bandingkan dengan hari tersedia sebelumnya (dari history.json)
+  const i = HISTORY.findIndex(h => h.tanggal === tanggal);
+  const prev = i > 0 ? HISTORY[i-1] : null;
+  const deltaHarga = (satu && prev?.harga_dasar_1gr != null)
+      ? satu.harga_dasar - prev.harga_dasar_1gr : null;
+  const spread = (satu && bb.buyback_per_gram)
+      ? satu.harga_dasar - bb.buyback_per_gram : null;
+
+  const lain = Object.entries(kategori)
+    .filter(([nama]) => nama !== 'Emas Batangan')
+    .map(([nama, rows]) => `
+      <details><summary>${nama}</summary>
+        <div class="inner">${tabel(rows)}</div>
+      </details>`).join('');
+
+  app.innerHTML = `
+    <div class="hero reveal">
+      <div class="card">
+        <span class="stamp">Antam LM · 999.9 Fine Gold</span>
+        <p class="label">Harga dasar 1 gram — ${fmtTgl(tanggal)}</p>
+        <div class="price-xl">Rp ${satu ? fmt.format(satu.harga_dasar) : '—'}<small> /gr</small></div>
+        <p class="sub">
+          + PPh 0,25% : <b>Rp ${satu ? fmt.format(satu.harga_pajak) : '—'}</b>
+          &nbsp; ${deltaBadge(deltaHarga, ' dari data sebelumnya')}
+        </p>
+      </div>
+      <div class="card">
+        <p class="label" style="margin-top:0">Harga Buyback per gram</p>
+        <div class="bb-row">
+          <span class="price-lg">Rp ${bb.buyback_per_gram ? fmt.format(bb.buyback_per_gram) : '—'}</span>
+          ${deltaBadge(bb.perubahan)}
+        </div>
+        <hr class="divider">
+        <p class="sub">Selisih jual–beli (spread 1 gr):
+          <b>${spread !== null ? 'Rp ' + fmt.format(spread) : '—'}</b></p>
+        <p class="sub">Update buyback: <b>${bb.update_terakhir || '—'}</b></p>
+      </div>
+    </div>
+
+    <section class="reveal">
+      <h2>Emas Batangan</h2>
+      <p class="note">Harga butik resmi, semua pecahan. Sumber diperbarui setiap hari pkl 08.30 WIB.</p>
+      <div class="card" style="padding:6px">${tabel(batangan)}</div>
+      ${lain ? `<section><h2 style="margin-top:30px">Kategori Lain</h2>${lain}</section>` : ''}
+    </section>
+
+    <section class="reveal">
+      <h2>Tren Harga</h2>
+      <p class="note">Harga dasar 1 gram vs harga buyback, dari seluruh data yang tersimpan.</p>
+      <div class="card chart-card"><div id="chart-wrap"><canvas id="chart"></canvas></div></div>
+    </section>`;
+
+  document.getElementById('meta').textContent =
+    'Data diambil: ' + (snap.diambil_pada || '—').replace('T',' ');
+  gambarGrafik();
+}
+
+function gambarGrafik(){
+  const ctx = document.getElementById('chart');
+  if(!ctx || !window.Chart) return;
+  if(chart) chart.destroy();
+  const css = getComputedStyle(document.documentElement);
+  const gold = css.getPropertyValue('--gold-hi').trim();
+  const turun = css.getPropertyValue('--turun').trim();
+  const muted = css.getPropertyValue('--muted').trim();
+  const line = css.getPropertyValue('--line').trim();
+
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: HISTORY.map(h => h.tanggal),
+      datasets:[
+        { label:'Harga dasar 1 gr', data:HISTORY.map(h => h.harga_dasar_1gr),
+          borderColor:gold, backgroundColor:gold, tension:.25, pointRadius:3 },
+        { label:'Buyback / gr', data:HISTORY.map(h => h.buyback_per_gram),
+          borderColor:turun, backgroundColor:turun, tension:.25, pointRadius:3 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{labels:{color:muted, font:{family:'Plus Jakarta Sans'}}},
+        tooltip:{callbacks:{label: c => ` ${c.dataset.label}: Rp ${fmt.format(c.parsed.y)}`}}
+      },
+      scales:{
+        x:{ticks:{color:muted, maxTicksLimit:10}, grid:{color:line}},
+        y:{ticks:{color:muted, callback:v => 'Rp ' + fmt.format(v)}, grid:{color:line}}
+      }
+    }
+  });
+}
+
+async function muat(tanggal){
+  try{
+    const snap = await getJSON(`/api/data?aksi=harga&tanggal=${tanggal}`);
+    render(tanggal, snap);
+  }catch(e){
+    app.innerHTML = `<div class="status">Data ${tanggal} tidak bisa dimuat (${e.message}).</div>`;
+  }
+}
+
+(async function init(){
+  try{
+    INDEX = await getJSON('/api/data?aksi=dates');
+    HISTORY = await getJSON('/api/data?aksi=history');
+    if(!INDEX.tanggal_tersedia?.length) throw new Error('database kosong');
+  }catch(e){
+    app.innerHTML = `<div class="status">
+      Belum ada data di database.<br><br>
+      Jalankan scrape pertama dengan membuka:<br>
+      <b>https://SITUS-ANDA.vercel.app/api/scrape?secret=CRON_SECRET</b><br><br>
+      lalu muat ulang halaman ini. Selanjutnya data masuk otomatis
+      setiap pagi pkl ±09.05 WIB.</div>`;
+    return;
+  }
+  const dates = [...(INDEX.tanggal_tersedia || [])]; // API sudah urut terbaru dulu
+  selTanggal.innerHTML = dates.map(d =>
+    `<option value="${d}">${fmtTgl(d)}</option>`).join('');
+  selTanggal.onchange = () => muat(selTanggal.value);
+  if(dates.length) muat(dates[0]);
+})();
+</script>
+</body>
+</html>
