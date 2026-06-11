@@ -222,40 +222,45 @@ def scrape():
 @app.route("/api/data")
 def data():
     aksi = request.args.get("aksi", "")
+    conn = None
     try:
         conn = db()
-        with conn, conn.cursor() as cur:
-            if aksi == "dates":
-                cur.execute("SELECT tanggal FROM harga_emas ORDER BY tanggal DESC;")
-                payload = {"tanggal_tersedia": [str(r[0]) for r in cur.fetchall()]}
+        cur = conn.cursor()
 
-            elif aksi == "harga":
-                cur.execute("SELECT snapshot FROM harga_emas WHERE tanggal=%s;",
-                            (request.args.get("tanggal", ""),))
-                row = cur.fetchone()
-                conn.close()
-                if not row:
-                    return jsonify({"error": "data tanggal itu tidak ada"}), 404
-                return Response(json.dumps(row[0], ensure_ascii=False),
-                                mimetype="application/json")
+        if aksi == "dates":
+            cur.execute("SELECT tanggal FROM harga_emas ORDER BY tanggal DESC;")
+            payload = {"tanggal_tersedia": [str(r[0]) for r in cur.fetchall()]}
 
-            elif aksi == "history":
-                cur.execute("""SELECT tanggal, harga_dasar_1gr, harga_pajak_1gr,
-                                      buyback_per_gram, spread_1gr
-                               FROM harga_emas ORDER BY tanggal ASC;""")
-                payload = [{"tanggal": str(r[0]), "harga_dasar_1gr": r[1],
-                            "harga_pajak_1gr": r[2], "buyback_per_gram": r[3],
-                            "spread_1gr": r[4]} for r in cur.fetchall()]
-            else:
-                conn.close()
-                return jsonify({"error": "aksi tidak dikenal (dates|harga|history)"}), 400
-        conn.close()
+        elif aksi == "harga":
+            cur.execute("SELECT snapshot FROM harga_emas WHERE tanggal=%s;",
+                        (request.args.get("tanggal", ""),))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "data tanggal itu tidak ada"}), 404
+            snap = row[0]
+            # JSONB bisa dikembalikan sebagai dict (umum) atau string (driver tertentu)
+            body = snap if isinstance(snap, str) else json.dumps(snap, ensure_ascii=False)
+            return Response(body, mimetype="application/json")
+
+        elif aksi == "history":
+            cur.execute("""SELECT tanggal, harga_dasar_1gr, harga_pajak_1gr,
+                                  buyback_per_gram, spread_1gr
+                           FROM harga_emas ORDER BY tanggal ASC;""")
+            payload = [{"tanggal": str(r[0]), "harga_dasar_1gr": r[1],
+                        "harga_pajak_1gr": r[2], "buyback_per_gram": r[3],
+                        "spread_1gr": r[4]} for r in cur.fetchall()]
+        else:
+            return jsonify({"error": "aksi tidak dikenal (dates|harga|history)"}), 400
+
         resp = Response(json.dumps(payload, ensure_ascii=False, default=str),
                         mimetype="application/json")
         resp.headers["Cache-Control"] = "s-maxage=300, stale-while-revalidate=600"
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 # untuk pengujian lokal: python app.py
