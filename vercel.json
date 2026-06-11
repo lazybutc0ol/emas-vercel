@@ -1,9 +1,5 @@
 {
   "crons": [
     { "path": "/api/scrape", "schedule": "5 2 * * *" }
-  ],
-  "functions": {
-    "api/scrape.py": { "maxDuration": 60 },
-    "api/data.py":   { "maxDuration": 15 }
-  }
+  ]
 }
