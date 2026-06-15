@@ -19,6 +19,7 @@ app = Flask(__name__)
 
 URL_HARGA = "https://www.logammulia.com/id/harga-emas-hari-ini"
 URL_BUYBACK = "https://www.logammulia.com/id/sell/gold"
+URL_GALERI24 = "https://galeri24.co.id/harga-emas"
 WIB = timezone(timedelta(hours=7))
 HTML_PATH = Path(__file__).resolve().parent / "web" / "index.html"
 
@@ -130,6 +131,58 @@ def parse_buyback(html: str) -> dict:
     return out
 
 
+def parse_galeri24(html: str) -> dict:
+    """Parser Galeri24: banyak kategori merek, tiap tabel kolom
+    Berat | Harga Jual | Harga Buyback. Berbasis teks baris agar tahan
+    terhadap apakah halaman memakai <table> atau <div> grid."""
+    text = BeautifulSoup(html, "html.parser").get_text("\n")
+    return _galeri24_from_text(text)
+
+
+def _galeri24_from_text(text: str) -> dict:
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    result = {"tanggal_halaman": None, "kategori": {}}
+    num_re = re.compile(r"^\d+(?:\.\d+)?$")
+    last_harga = None
+    i, n = 0, len(lines)
+
+    while i < n:
+        ln = lines[i]
+
+        m = re.match(r"Diperbarui\s+(.+)", ln)
+        if m and not result["tanggal_halaman"]:
+            result["tanggal_halaman"] = m.group(1).strip()
+
+        if ln.startswith("Harga "):
+            last_harga = ln[len("Harga "):].strip()
+
+        # Awal tabel: baris "Berat" diikuti header "...Jual" lalu "...Buyback"
+        if (ln == "Berat" and i + 2 < n
+                and "Jual" in lines[i + 1] and "Buyback" in lines[i + 2]):
+            cat = (last_harga or "Tidak diketahui").split(" - ")[0].strip()
+            rows = []
+            j = i + 3
+            while j + 2 < n:  # butuh 3 baris: berat, jual, buyback
+                berat_s, jual_s, buyback_s = lines[j], lines[j + 1], lines[j + 2]
+                if not num_re.match(berat_s):
+                    break
+                if not (jual_s.startswith("Rp") and buyback_s.startswith("Rp")):
+                    break
+                rows.append({
+                    "berat_gr": float(berat_s),
+                    "harga_jual": _to_int(jual_s),
+                    "harga_buyback": _to_int(buyback_s),
+                })
+                j += 3
+            if rows:
+                result["kategori"][cat] = rows
+            i = j
+            continue
+        i += 1
+
+    return result
+
+
 # =========================================================================
 # DATABASE (Postgres)
 # =========================================================================
@@ -175,7 +228,8 @@ def scrape():
     try:
         snap = {
             "diambil_pada": datetime.now(WIB).isoformat(timespec="seconds"),
-            "sumber": {"harga": URL_HARGA, "buyback": URL_BUYBACK},
+            "sumber": {"harga": URL_HARGA, "buyback": URL_BUYBACK,
+                       "galeri24": URL_GALERI24},
             "harga": parse_harga(fetch(URL_HARGA)),
             "buyback": parse_buyback(fetch(URL_BUYBACK)),
         }
@@ -183,6 +237,17 @@ def scrape():
         if not batangan:
             return jsonify({"ok": False, "error": "Tabel Emas Batangan tidak terbaca "
                             "(diblokir antibot / struktur berubah). Data lama aman."}), 502
+
+        # Galeri24 — non-fatal: kalau gagal, data logammulia tetap disimpan
+        galeri24_status = "ok"
+        try:
+            g24 = parse_galeri24(fetch(URL_GALERI24))
+            if g24["kategori"]:
+                snap["galeri24"] = g24
+            else:
+                galeri24_status = "kosong (kemungkinan diblokir / struktur berubah)"
+        except Exception as ge:
+            galeri24_status = f"gagal: {ge}"
 
         satu = next((x for x in batangan if x["berat_gr"] == 1.0), None)
         bb = snap["buyback"]["buyback_per_gram"]
@@ -214,7 +279,9 @@ def scrape():
         conn.close()
         return jsonify({"ok": True, "tanggal": tanggal,
                         "harga_dasar_1gr": satu["harga_dasar"] if satu else None,
-                        "buyback_per_gram": bb})
+                        "buyback_per_gram": bb,
+                        "galeri24_kategori": len(snap.get("galeri24", {}).get("kategori", {})),
+                        "galeri24_status": galeri24_status})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
