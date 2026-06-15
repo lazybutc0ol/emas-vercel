@@ -176,6 +176,37 @@ function tabel(rows){
     <tbody>${tr}</tbody></table>`;
 }
 
+function tabelG24(rows){
+  const tr = rows.map(r => `
+    <tr>
+      <td>${fmt.format(r.berat_gr)} gram</td>
+      <td>${r.harga_jual ? 'Rp ' + fmt.format(r.harga_jual) : '—'}</td>
+      <td>${r.harga_buyback ? 'Rp ' + fmt.format(r.harga_buyback) : '—'}</td>
+    </tr>`).join('');
+  return `<table>
+    <thead><tr><th>Berat</th><th>Harga Jual</th><th>Buyback</th></tr></thead>
+    <tbody>${tr}</tbody></table>`;
+}
+
+function sectionGaleri24(snap){
+  const g = snap.galeri24;
+  if(!g || !g.kategori || !Object.keys(g.kategori).length) return '';
+  // GALERI 24 & ANTAM dibuka default (paling relevan), sisanya bisa diklik
+  const utama = ['GALERI 24', 'ANTAM'];
+  const entries = Object.entries(g.kategori);
+  const blok = entries.map(([nama, rows]) => {
+    const open = utama.includes(nama) ? ' open' : '';
+    return `<details${open}><summary>${nama} <span style="color:var(--muted);font-weight:400">· ${rows.length} pecahan</span></summary>
+      <div class="inner">${tabelG24(rows)}</div></details>`;
+  }).join('');
+  return `<section class="reveal">
+    <h2>Galeri24 <span style="font-size:13px;color:var(--muted);font-weight:400">(Pegadaian)</span></h2>
+    <p class="note">${entries.length} merek emas, harga jual &amp; buyback per berat.
+      Sumber: galeri24.co.id${g.tanggal_halaman ? ' · diperbarui ' + g.tanggal_halaman : ''}.</p>
+    ${blok}
+  </section>`;
+}
+
 function render(tanggal, snap){
   const kategori = snap.harga?.kategori || {};
   const batangan = kategori['Emas Batangan'] || [];
@@ -221,15 +252,17 @@ function render(tanggal, snap){
     </div>
 
     <section class="reveal">
-      <h2>Emas Batangan</h2>
+      <h2>Emas Batangan <span style="font-size:13px;color:var(--muted);font-weight:400">(ANTAM / logammulia)</span></h2>
       <p class="note">Harga butik resmi, semua pecahan. Sumber diperbarui setiap hari pkl 08.30 WIB.</p>
       <div class="card" style="padding:6px">${tabel(batangan)}</div>
-      ${lain ? `<section><h2 style="margin-top:30px">Kategori Lain</h2>${lain}</section>` : ''}
+      ${lain ? `<section><h2 style="margin-top:30px">Kategori Lain (logammulia)</h2>${lain}</section>` : ''}
     </section>
+
+    ${sectionGaleri24(snap)}
 
     <section class="reveal">
       <h2>Tren Harga</h2>
-      <p class="note">Harga dasar 1 gram vs harga buyback, dari seluruh data tersimpan.</p>
+      <p class="note">Harga dasar 1 gram vs harga buyback (ANTAM/logammulia), dari seluruh data tersimpan.</p>
       <div class="card chart-card"><div id="chart-wrap"><canvas id="chart"></canvas></div></div>
     </section>`;
 
